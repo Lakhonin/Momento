@@ -167,4 +167,10 @@ $obj.GetSpecifiedLicenseServerList()
 $obj = gwmi -namespace "Root/CIMV2/TerminalServices" Win32_TerminalServiceSetting
 $obj.SetSpecifiedLicenseServerList("msk-rdslic.winitpro.ru")
 **********
+Удаление сервера из фермы Remote Desktop Services
+Remove-RDSessionHost -SessionHost @("rdsh2.winitpro.ru") -ConnectionBroker rdcb.winitpro.ru –verbose
+
+use RDCms;
+delete from rds.RoleRdsh where ServerID = '3';
+delete from rds.Server where Id = '3';
 

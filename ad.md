@@ -208,4 +208,80 @@ Active Directory — структура очень гибкая и масшта�
 • distinguished name (dn) — различающееся имя. Однозначно определяет объект и указывает его расположение в структуре AD. Например ″CN=Vasily Pupkin, OU=Employees, OU=Accounts, DC=Contoso, DC=com″.  Максимальная длина dn составляет 256 символов, при превышении этой длины LDAP-клиент не сможет получить доступ к объекту и выдаст ошибку.
 Такие вот ограничения. Помнить их все наизусть вовсе необязательно, но если вы работаете с AD, то нужно хотя-бы знать об их существовании. Более подробно об ограничениях Active Directory можно узнать из статьи Active Directory Maximum Limits — Scalability.
 ********
+1.	
+Скопировать группы Active Directory другому пользователю
+$getusergroups = Get-ADUser -Identity r.radojic -Properties memberof | Select-Object -ExpandProperty memberof
+$getusergroups | Add-ADGroupMember -Members a.novak -verbose
+****
+Отсутствуют серверы, которые могут обработать запрос на вход в сеть
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon").CachedLogonsCount
+nltest /dsgetdc:winitpro.ru
+nltest /SC_RESET:WINITPRO\MSK-DC02.winitpro.ru
+Определить на каком контроллере домена (Logon Server) вы аутентифицировались
+Упрощенно процесс поиска контроллера домена клиентом Windows выглядит так:
+1.	При загрузке Windows служба NetLogon делает DNS запрос за списком контроллеров домена (SVR записи _ldap._tcp.dc._msdcs.domain_ ;
+2.	DNS возвращает список DC в домене;
+3.	Клиент делает LDAP запрос к DC для определения сайта AD по-своему IP адресу;
+4.	DC возвращает сайт, которому соответствует IP клиента или наиболее близкий сайт (эта информация кэшируется в ветке реестра HKLM\System\CurrentControlSet\Services\Netlogon\Parameters и используется при следующем входе для более быстрого поиска);
+5.	Клиент через DNS запрашивает список контроллеров домена в сайте (в разделе _ tcp.sitename._sites... );
+Windows пытается связаться со всеми DC в сайте и первый ответивший используется для выполнении аутентификации и в качестве LogonServer
+***
+Настраиваем резервное копирование контроллеров домена Active Directory
+Import-Module ServerManager
+[string]$date = get-date -f 'yyyy-MM-dd'
+$path=”\\srvbak1\backup\dc1\”
+$TargetUNC=$path+$date
+$TestTargetUNC= Test-Path -Path $TargetUNC
+if (!($TestTargetUNC)){
+New-Item -Path $TargetUNC -ItemType directory
+}
+$WBadmin_cmd = "wbadmin.exe START BACKUP -backupTarget:$TargetUNC -systemState -noverify -vssCopy -quiet"
+Invoke-Expression $WBadmin_cmd
+***
+Делегирование административных полномочий в Active Directory
+можете делегировать права в AD на четырех уровнях:
+1.	Сайта AD;
+2.	Всего домена;
+3.	Конкретной OU в Active Directory;
+4.	Конкретного объекта AD.
+
+•	Create, delete, and manage user accounts;
+•	Reset user passwords and force password change at next logon;
+•	Read all user information;
+•	Create, delete and manage groups;
+•	Modify the membership of a group;
+•	Manage Group Policy links;
+•	Generate Resultant Set of Policy (Planning);
+•	Generate Resultant Set of Policy (Logging);
+•	Create, delete, and manage inetOrgPerson accounts;
+•	Reset inetOrgPerson passwords and force password change at next logon;
+•	Read all inetOrgPerson information.
+# Получаем OU
+$OUs = Get-ADOrganizationalUnit -Filter 'DistinguishedName -eq "OU=Users,OU=NSK,DC=winitpro,DC=ru"'| Select-Object -ExpandProperty DistinguishedName
+$schemaIDGUID = @{}
+$ErrorActionPreference = 'SilentlyContinue'
+Get-ADObject -SearchBase (Get-ADRootDSE).schemaNamingContext -LDAPFilter '(schemaIDGUID=*)' -Properties name, schemaIDGUID |
+ForEach-Object {$schemaIDGUID.add([System.GUID]$_.schemaIDGUID,$_.name)}
+Get-ADObject -SearchBase "CN=Extended-Rights,$((Get-ADRootDSE).configurationNamingContext)" -LDAPFilter '(objectClass=controlAccessRight)' -Properties name, rightsGUID |
+ForEach-Object {$schemaIDGUID.add([System.GUID]$_.rightsGUID,$_.name)}
+$ErrorActionPreference = 'Continue'
+ForEach ($OU in $OUs) {
+$report += Get-Acl -Path "AD:\$OU" |
+Select-Object -ExpandProperty Access |
+Select-Object @{name='organizationalUnit';expression={$OU}}, `
+@{name='objectTypeName';expression={if ($_.objectType.ToString() -eq '00000000-0000-0000-0000-000000000000') {'All'} Else {$schemaIDGUID.Item($_.objectType)}}}, `
+@{name='inheritedObjectTypeName';expression={$schemaIDGUID.Item($_.inheritedObjectType)}}, `
+*
+}
+# отчет с назначенными правами на OU
+
+$ou = "AD:\OU=test,DC=test,DC=com"
+$group = Get-ADGroup helpdesk
+$sid = new-object System.Security.Principal.SecurityIdentifier $group.SID
+$ResetPassword = [GUID]"00299570-246d-11d0-a768-00aa006e0529"
+$UserObjectType = "bf967aba-0de6-11d0-a285-00aa003049e2"
+$ACL = get-acl $OU
+$RuleResetPassword = New-Object System.DirectoryServices.ActiveDirectoryAccessRule ($sid, "ExtendedRight", "Allow", $ResetPassword, "Descendents", $UserObjectType)
+$ACL.AddAccessRule($RuleResetPassword)
+Set-Acl -Path $OU -AclObject $ACL
 

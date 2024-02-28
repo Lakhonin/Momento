@@ -108,3 +108,74 @@ get-mailbox kbuldogov |ft Name, Maxsendsize, maxreceivesize
 Get-Mailbox kbuldogov@winitpro.onmicrosoft.com| fl mailboxplan,maxsendsize
 Set-Mailbox kbuldogov -MaxReceiveSize 50MB -MaxSendSize 50MB
 **********
+Ошибка Exchange “452 4.3.1 Insufficient system resources”
+Причина возникновения ошибки – окончание свободного места на диске, на котором находятся очереди службы Exchange Hub Transport. Дело в том, что в Exchange есть специальный компонент мониторинга доступных ресурсов Back Pressure, который в том числе отслеживает свободное место на диске, на котором хранятся очереди транспортной службы Exchange
+•	порог Medium (90%) — перестать принимать по SMTP почту от внешних отправителей (почта от MAPI клиентов при этом обрабатывается)
+•	порог High (99%) — обработка потока почты полностью прекращается
+Управление почтовыми правилами в ящике Exchange
+•	Серверные правила Outlook (Server-side rules) — выполняются на стороне сервера Exchange при получении письма. При этом не важно, запущен ли Outlook у пользователя или нет. На стороне сервера могут выполняться следующие виды правил: установка флага важности письма, перемещение письма в другую папку ящика, удаление сообщения, пересылка письма в другой ящик. Правила, которые создаются через Outlook Web App всегда выполняются на стороне сервера;
+•	Клиентские правила (Client-side rules) выполняются только в запущенном клиенте Outlook. Пример таких правил: перемещение письма в PST файл, отметить письмо прочитанным (как проверить, прочитал ли пользователь Exchange письмо), вывести оповещение или воспроизвести звук. Этими правилами нельзя управлять из PowerShell. В интерфейсе Outlook у таких правил указан статус «только клиент».
+Get-InboxRule -Mailbox abivanov -IncludeHidden
+****
+Управление группами рассылок в Exchange
+•	Группы рассылки (Mail-enabled universal distribution groups) – используются только для рассылки писем. В обычных группах рассылки (не security) вы можете разрешить пользователям самим добавляться или удаляться из группы (membership approval);
+•	Группы безопасности (Mail-enabled universal security groups) – используются как для рассылки электронных писем, так и для предоставления доступа к ресурсам в домене Active Directory;
+•	Динамическая группа рассылки (Dynamic Distribution Group) – состав членов группы (получателей) формируется автоматически на основании LDAP-фильтра.
+
+New-DistributionGroup -Name “HelpDesk” -SamAccountName “HelpDesk” -OrganizationalUnit “winitpro.ru/ru/groups” -DisplayName "HelpDesk team" -Alias helpdesk
+New-DynamicDistributionGroup -Name 'IT dept' -RecipientContainer 'winitpro.ru/ru/user' -IncludedRecipients 'AllRecipients' -ConditionalDepartment 'Департамент ИТ' -OrganizationalUnit 'winitpro.ru/ru/groups/exchange' -Alias itdept
+***
+Язык, имена папок, часовой пояс и региональные параметры в Exchange
+Get-Mailbox aaivanov| Set-MailboxRegionalConfiguration -LocalizeDefaultFolderName:$true -Language "en-US" -TimeZone "Russian Standard Time"
+Get-Mailbox aaivanov| Set-MailboxRegionalConfiguration -LocalizeDefaultFolderName:$true -Language "ru-RU" –DateFormat “yyyy-MM-dd” –TimeFormat “HH:mm”
+***
+Get-MessageTrackingLog: отслеживание сообщений в журналах Exchange
+%ExchangeInstallPath%TransportRoles\Logs\MessageTracking
+•	Sender – поиск по отправителю;
+•	Recipients — поиск по получателю;
+•	Server – поиск на определенном транспортном сервере;
+•	Start «02/30/2019 08:00:00» -End «02/31/2019 21:00:00” — поиск за определённый промежуток времени;
+•	MessageSubject — поиск по теме сообщения;
+•	EventID – поиск по коду события сервера (как правило используются коды RECEIVE, SEND, FAIL, DSN, DELIVER, BADMAIL, RESOLVE, EXPAND, REDIRECT, TRANSFER, SUBMIT, POISONMESSAGE, DEFER);
+•	messageID – трекинг письма по его ID.
+Get-MessageTrackingLog -Sender "dbpetrov@winitpro.ru" -Recipients "aksimonova@winitpro.ru" -ResultSize unlimited –server msk-hub-01| Select-Object Timestamp,Sender,{$_.recipients},MessageSubject | Export-Csv-Path "C:\ps\exchange\msg_tracking_out.csv" -Encoding Default -Delimiter ";"
+***
+Блокировка адресов и доменов отправителей в Exchange
+	On-premises Exchange Server	Exchange Online (Microsoft 365)
+Фильтры антиспам агента Sender Filter	+	
+Блокировка отправителей с помощью транспортных правил (mailflow rules)	+	+
+Индивидуальные списки заблокированных адресов в почтовых ящиках	+	+
+Список разрешенных доменов и адресов (Tenant Allow/Block List)		+
+
+Enable-TransportAgent "Recipient Filter Agent"
+тобы активировать фильтр, выполните:
+Set-SenderFilterConfig -Enabled $true
+Если нужно фильтровать только внешних отправителей, выполните:
+Set-SenderFilterConfig -ExternalMailEnabled $true
+Теперь вы можете указать список e-mail адресов, которых нужно заблокировать.
+Set-SenderFilterConfig -BlockedSenders info@spam.ru,admin@baddomain.ru
+Чтобы заблокировать все письма с определенных доменов и всех поддоменов:
+Set-SenderFilterConfig -BlockedDomainsAndSubdomains spammer.com,masssend.net
+Чтобы получить список заблокированных адресов, выполните команду:
+Get-SenderFilterConfig |fl BlockedSenders,BlockedDomains,BlockedDomainsAndSubdomains
+Вывести список всех заблокированных адресов:
+Get-SenderFilterConfig |fl BlockedSenders,BlockedDomains,BlockedDomainsAndSubdomains
+Если нужно добавить в список заблокированных доменов/адресов новые записи, воспользуйтесь такой конструкцией:
+Set-SenderFilterConfig -BlockedSenders @{Add=”new@mail.ru”}
+Или
+Set-SenderFilterConfig -BlockedDomainsAndSubdomains @{Add=”blokme.ru”,”spammers.com”,”fb.com”}
+$list1 = @('contoso.com','contoso2.com',)
+New-TransportRule -Name "block_sender_domain" -RecipientAddressMatchesPatterns $list1 RejectMessageEnhancedStatusCode '5.7.1' -RejectMessageReasonText "Blocked recipients"
+Вывести информацию о транспортном правиле:
+Get-TransportRule block_sender_domain | select name,State,SenderDomainIs,RejectMessageReasonText
+
+Set-MailboxJunkEmailConfiguration -Identity avpetrov –BlockedSendersandDomains @{Add=”new@mail.ru”}
+Настройка белого списка отправителей и доменов в Exchange
+Get-ContentFilterConfig | Format-List Enabled, ExternalMailEnabled, InternalMailEnabled
+Outlook 2016/2013 постоянно запускается в автономном режиме
+Что еще мы проверяли при диагностике этой проблемы:
+1.	Доступность ящика через веб-интерфейса OWA: ящик доступен;
+2.	В Exchange 2010 нужно проверить доступность CAS сервера от пользователя по порту TCP/135 (RPC-локатор). Можно выполнить с помощью командлета Test-NetConnection: tnc msg-cas –port 135 – порт доступен. В Exchange 2013/2016 в качестве основного протокола подключения клиентов Outlook к CAS является HTTPS (MAPI over HTTP), поэтому достаточно проверить доступность порта 443.
+3.	Запускали Outlook в безопасном режиме (команда outlook.exe /safe) и отключали все надстройки: проблема сохранялась;
+4.	Пытались удалять, профиль Outlook и пересоздавать его заново. Выполняли переустановку и Repair Outlook – все это не помогало.
+Решение проблемы оказалось неожиданным: у всех пользователей, у которых Outlook запускался в офлайн режиме был установлен мессенджер Skype for Business(Lync). Оказалось, что, если на компьютере одновременно запущены Lync и Outlook, то когда вы изменяете настройки Автономного режима, они не сохраняются после закрытия Outlook (Lync каким-то образом блокирует сохранение настройки автономной работы, видимо потому что также держит постоянное подключение с Exchange).
