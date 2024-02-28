@@ -462,3 +462,15 @@ Target list
 • Сначала проверяет, не совпадает ли имя с локальным именем хоста;
 • Затем смотрит в кэш DNS;
 • И только если в кэше соответствие не найдено, отправляет запрос к серверу DNS.
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs9.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs10.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs7.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs5.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs4.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs8.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs6.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs3.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/04/dfs2.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/05/dfs17.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/05/dfs16.png)
+![alt text](https://windowsnotes.ru/wp-content/uploads/2020/05/dfs12.png)
