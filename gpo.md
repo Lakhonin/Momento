@@ -86,3 +86,28 @@ cat %SYSTEMDRIVE%\ProgramData\GroupPolicy\Preference\Trace\User.log
 ``` powershell
 cat %SYSTEMDRIVE%\ProgramData\GroupPolicy\Preference\Trace\Computer.log
 ```
+******************
+Windows не удалось подключиться к службе Клиент групповой политики 
+Windows Registry Editor Version 5.00
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost]
+"GPSvcGroup"=hex(7):47,00,50,00,53,00,76,00,63,00,00,00,00,00
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost\GPSvcGroup]
+"AuthenticationCapabilities"=dword:00003020
+"CoInitializeSecurityParam"=dword:00000001
+**************
+Сброс настроек групповых политик
+•	Настройки конфигурации компьютера (раздел Computer Configuration) хранятся в%SystemRoot%\System32\GroupPolicy\Machine\registry.pol
+•	Пользовательские политики (раздел User Configuration) —%SystemRoot%\System32\GroupPolicy\User\registry.pol
+rd /S /Q C:\Windows\System32\GroupPolicy
+rd /S /Q C:\Windows\System32\GroupPolicyUsers
+Локальные политики безопасности (local security policies)
+secedit /configure /cfg %windir%\inf\defltbase.inf /db defltbase.sdb /verbose
+
+DEL /S /F /Q “%ALLUSERSPROFILE%\Microsoft\Group Policy\History\*.*”
+REG DELETE HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Group Policy /f
+REG DELETE HKLM\Software\Policies\Microsoft /f
+REG DELETE HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies /f
+REG DELETE HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies /f
+REG DELETE HKCU\Software\Policies\Microsoft /f
+REG DELETE "HKCU\Software\Microsoft\Windows\CurrentVersion\Group Policy Objects" /f
+DEL /F /Q C:\WINDOWS\security\Database\secedit.sdb
